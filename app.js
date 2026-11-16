@@ -841,11 +841,25 @@ async function downloadBundle(b, card) {
   try {
     for (const f of todo) {
       btn.textContent = "Downloading " + b.name + "…";
-      await downloadFile(f, (frac) => { fill.style.width = ((doneBytes + frac * (f.size || 0)) / totalBytes * 100).toFixed(1) + "%"; });
+      // flaky connections drop mid-file: retry each file a few times
+      let lastErr = null;
+      for (let attempt = 0; attempt < 4 && !isLocal(f); attempt++) {
+        try {
+          await downloadFile(f, (frac) => { fill.style.width = ((doneBytes + frac * (f.size || 0)) / totalBytes * 100).toFixed(1) + "%"; });
+          lastErr = null;
+        } catch (err) {
+          lastErr = err;
+          console.error("pack download attempt failed:", f.file, err);
+          await opfsDelete(f.file);
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+      if (lastErr) throw lastErr;
       doneBytes += f.size || 0;
     }
     toast(b.name + " saved on your phone — works offline now");
   } catch (e) {
+    console.error("pack download stopped:", e);
     toast("Download stopped — check Wi-Fi and try again");
   }
   btn.disabled = false;
