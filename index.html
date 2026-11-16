@@ -24,22 +24,42 @@
 </div>
 
 <div id="side-buttons">
-  <button id="btn-follow" class="round-btn big" aria-label="Follow my location">🎯</button>
-  <button id="btn-record" class="round-btn big" aria-label="Record track">⏺</button>
-  <button id="btn-route" class="round-btn big" aria-label="Plan a route">🧭</button>
-  <button id="btn-packs" class="round-btn big" aria-label="Map downloads">⬇<span id="packs-badge" class="badge hidden">!</span></button>
+  <button id="btn-follow" class="ctl-btn" aria-label="Follow my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+    <span class="ctl-label">Follow</span>
+  </button>
+  <button id="btn-record" class="ctl-btn" aria-label="Record track">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="currentColor"/></svg>
+    <span class="ctl-label">Record</span>
+  </button>
+  <button id="btn-route" class="ctl-btn" aria-label="Plan a route">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 15.5v-2a3 3 0 0 1 3-3h5a3 3 0 0 0 3-3" stroke-dasharray="3.2 2.6"/><circle cx="6.5" cy="18" r="2.6" fill="#fff"/><circle cx="17.5" cy="5" r="2.6" fill="#fff"/></svg>
+    <span class="ctl-label">Route</span>
+  </button>
+  <button id="btn-packs" class="ctl-btn" aria-label="Map downloads">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10M7.5 9.5 12 14l4.5-4.5"/><path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></svg>
+    <span class="ctl-label">Packs</span><span id="packs-badge" class="badge hidden">!</span>
+  </button>
+  <button id="btn-north" class="ctl-btn hidden" aria-label="Point north">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 6.2 14.6 14.6 12 13 9.4 14.6Z" fill="currentColor" stroke="none"/></svg>
+    <span class="ctl-label">North</span>
+  </button>
 </div>
-
-<button id="btn-north" class="round-btn hidden" aria-label="Point north">🧭<span class="north-n">N</span></button>
 
 <div id="pill" class="hidden"></div>
 
 <div id="route-bar" class="hidden">
   <span id="route-info">Tap the map to drop points</span>
-  <button id="route-undo" class="bar-btn">Undo</button>
-  <button id="route-clear" class="bar-btn">Clear</button>
-  <button id="route-done" class="bar-btn primary">Done</button>
+  <span id="route-ele" class="hidden"></span>
+  <svg id="route-profile" class="hidden" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true"></svg>
+  <div class="route-btns">
+    <button id="route-undo" class="bar-btn">Undo</button>
+    <button id="route-clear" class="bar-btn">Clear</button>
+    <button id="route-done" class="bar-btn primary">Done</button>
+  </div>
 </div>
+
+<button id="route-chip" class="hidden"></button>
 
 <div id="card" class="hidden">
   <button id="card-close" aria-label="Close">✕</button>
@@ -88,10 +108,10 @@
     </div>
 
     <h3>My tracks</h3>
-    <div id="tracks-list"><p class="fineprint">No tracks recorded yet. Tap the red ⏺ button on the map, ride, tap it again to stop. Your track is saved on this phone and you can share it as a GPX file.</p></div>
+    <div id="tracks-list"><p class="fineprint">No tracks recorded yet. Tap the red Record button on the map, ride, tap it again to stop. Your track is saved on this phone and you can share it as a GPX file.</p></div>
 
     <h3>About</h3>
-    <p class="fineprint">Built from free public data: OpenStreetMap, U.S. Forest Service MVUM &amp; trail inventory, Oregon Dept. of Forestry (trails &amp; state forest boundaries), USGS PAD-US land ownership, U.S. Census Bureau (state &amp; county boundaries), and AWS Terrain Tiles (SRTM elevation). Trail and land data are navigation aids, not survey data — obey posted signs and closures; they beat this map. Works fully offline once the map packs are downloaded.</p>
+    <p class="fineprint">Built from free public data: OpenStreetMap (including the small-roads layer that keeps minor roads and forest tracks visible when you zoom out), U.S. Forest Service MVUM &amp; trail inventory, Oregon Dept. of Forestry (trails &amp; state forest boundaries), USGS PAD-US land ownership, U.S. Census Bureau (state &amp; county boundaries), and AWS Terrain Tiles (SRTM elevation — route climb/descent is measured from it). Trail and land data are navigation aids, not survey data — obey posted signs and closures; they beat this map. Works fully offline once the map packs are downloaded.</p>
     <p class="fineprint" id="storage-line"></p>
   </div>
 </div>

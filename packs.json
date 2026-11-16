@@ -1,5 +1,5 @@
 {
- "version": 2,
+ "version": 3,
  "bundles": [
   {
    "id": "oregon",
@@ -60,6 +60,12 @@
      "file": "bounds.geojson",
      "role": "bounds",
      "size": 133354
+    },
+    {
+     "id": "lowroads",
+     "file": "lowroads.pmtiles",
+     "role": "lowroads",
+     "size": 19380223
     }
    ]
   },

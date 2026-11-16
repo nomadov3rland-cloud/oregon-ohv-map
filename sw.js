@@ -1,7 +1,7 @@
 /* Oregon OHV Map service worker.
    Caches the app shell + glyphs. Map pack files under packs/ are managed by
    the app itself (OPFS) and are NEVER intercepted here. */
-const VERSION = "ohv-v2";
+const VERSION = "ohv-v3";
 const SHELL = [
   "./",
   "index.html",

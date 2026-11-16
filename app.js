@@ -60,20 +60,27 @@ function fileState(file) {
 }
 function isLocal(file) { return fileState(file) === "current"; }
 
-async function sourceFor(file) {
-  // Returns {url, pmtiles} — registers the archive with the protocol.
+/* DEM archives also feed the route elevation sampler (real Terrarium
+   elevation tiles from the packs — see elevationAt below). */
+const demRegistry = {}; // bundleId -> {pmt, zoom}
+async function sourceFor(file, bundleId) {
+  // Returns the pmtiles:// url — registers the archive with the protocol.
+  let p = null, url = null;
   if (isLocal(file)) {
     const blob = await opfsFile(file.file);
     if (blob) {
-      const p = new pmtiles.PMTiles(new pmtiles.FileSource(blob));
-      protocol.add(p);
-      return "pmtiles://" + file.file;
+      p = new pmtiles.PMTiles(new pmtiles.FileSource(blob));
+      url = "pmtiles://" + file.file;
     }
   }
-  const url = new URL("packs/" + file.file, document.baseURI).href;
-  const p = new pmtiles.PMTiles(url);
+  if (!p) {
+    const u = new URL("packs/" + file.file, document.baseURI).href;
+    p = new pmtiles.PMTiles(u);
+    url = "pmtiles://" + u;
+  }
   protocol.add(p);
-  return "pmtiles://" + url;
+  if (file.role === "dem" && bundleId) demRegistry[bundleId] = { pmt: p, zoom: file.maxzoom || 12 };
+  return url;
 }
 
 async function campingData() {
@@ -156,19 +163,21 @@ async function buildStyle() {
   for (const { bundle, file } of allFiles()) {
     if (file.role === "basemap") {
       const sid = "bm-" + bundle.id;
-      sources[sid] = { type: "vector", url: await sourceFor(file) };
+      sources[sid] = { type: "vector", url: await sourceFor(file, bundle.id) };
       bm[bundle.id] = sid;
     } else if (file.role === "dem") {
       sources["dem-" + bundle.id] = {
-        type: "raster-dem", url: await sourceFor(file),
+        type: "raster-dem", url: await sourceFor(file, bundle.id),
         encoding: "terrarium", tileSize: 256, maxzoom: file.maxzoom || 12,
       };
     } else if (file.role === "contours") {
-      sources["ct-" + bundle.id] = { type: "vector", url: await sourceFor(file) };
+      sources["ct-" + bundle.id] = { type: "vector", url: await sourceFor(file, bundle.id) };
     } else if (file.role === "land") {
-      sources.land = { type: "vector", url: await sourceFor(file) };
+      sources.land = { type: "vector", url: await sourceFor(file, bundle.id) };
     } else if (file.role === "trails") {
-      sources.trails = { type: "vector", url: await sourceFor(file) };
+      sources.trails = { type: "vector", url: await sourceFor(file, bundle.id) };
+    } else if (file.role === "lowroads") {
+      sources.lowroads = { type: "vector", url: await sourceFor(file, bundle.id) };
     }
   }
   sources.units = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
@@ -353,6 +362,41 @@ async function buildStyle() {
   }
   addRoads(state, "st", 0, null, 12.99);
   for (const r of REGIONS) if (bm[r]) addRoads(bm[r], r, 12.5, null, null);
+
+  // Low-zoom roads overlay (v3): the Protomaps basemap tiles drop minor
+  // roads and forest tracks below zoom 12 entirely (verified by decoding
+  // tiles — the data is not there, so no style could draw it). This
+  // OSM-built layer carries the small roads at zooms 8-11 so you can
+  // still follow where they go when zoomed out; at zoom 12 the basemap's
+  // own tiles start carrying them, so the overlay hands off there.
+  if (sources.lowroads) {
+    const lrOpt = { minzoom: 7.5, maxzoom: 11.99 };
+    push({ id: "lr-case", type: "line", source: "lowroads", "source-layer": "lowroads", ...lrOpt,
+      filter: ["in", ["get", "cls"], ["literal", ["minor", "track"]]],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "rgba(110,100,85,0.5)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.5, 11, 2.4, 12.49, 3.2] } });
+    push({ id: "lr-major", type: "line", source: "lowroads", "source-layer": "lowroads", ...lrOpt,
+      filter: ["==", ["get", "cls"], "major"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#f2cd85",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.2, 11, 2.2, 12.49, 3] } });
+    push({ id: "lr-minor", type: "line", source: "lowroads", "source-layer": "lowroads", ...lrOpt,
+      filter: ["==", ["get", "cls"], "minor"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#ffffff",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 11, 1.7, 12.49, 2.4] } });
+    push({ id: "lr-track", type: "line", source: "lowroads", "source-layer": "lowroads", ...lrOpt,
+      filter: ["==", ["get", "cls"], "track"],
+      layout: { "line-join": "round" },
+      paint: { "line-color": "#a98a68",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 11, 1.5, 12.49, 2], "line-dasharray": [4, 2] } });
+    push({ id: "lr-label", type: "symbol", source: "lowroads", "source-layer": "lowroads",
+      minzoom: 10.5, maxzoom: 11.99, filter: ["has", "name"],
+      layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": FONT_REG,
+        "text-size": 11.5, "text-max-angle": 30 },
+      paint: { "text-color": "#4a4238", "text-halo-color": "rgba(255,255,255,0.95)", "text-halo-width": 1.8 } });
+  }
 
   // buildings (regions only — statewide archive tops out at z12)
   for (const r of REGIONS) if (bm[r]) {
@@ -620,6 +664,7 @@ async function onStyleReady() {
   } catch (e) { /* trail names load with the Oregon pack */ }
   if (selectedTrail) setTrailHighlight(selectedTrail);
   applyDynamic();
+  updateRouteChip();
   refreshPacksBadge();
   if (!updateToastShown) {
     updateToastShown = true;
@@ -629,7 +674,7 @@ async function onStyleReady() {
       // he already has most of the Oregon pack, but some files are new or
       // changed on the server — point him at the (small) update once.
       if ((st === "partial" || st === "stale") && og.files.some((f) => fileState(f) === "current")) {
-        toast("A map update is available — tap ⬇ Packs to get it (small download)", 6000);
+        toast("A map update is available — tap Packs on the right side to get it (small download)", 6000);
       }
     }
   }
@@ -670,8 +715,8 @@ let gpsWatch = null, firstFixDone = false;
 function setFollow(mode) {
   followMode = mode;
   $("btn-follow").classList.toggle("active", mode > 0);
-  if (mode === 1) toast("Following you — tap 🎯 again to turn with your direction");
-  if (mode === 2) toast("Heading-up — map turns with you. Tap 🎯 to stop following");
+  if (mode === 1) toast("Following you — tap Follow again to turn with your direction");
+  if (mode === 2) toast("Heading-up — map turns with you. Tap Follow to stop following");
   if (mode === 0) toast("Follow off");
   if (mode > 0 && mePos) centerOnMe(true);
 }
@@ -736,6 +781,7 @@ function toggleRecord() {
     rec.on = true; rec.points = [[mePos.lng, mePos.lat, mePos.alt || 0, Date.now()]]; rec.dist = 0; rec.start = Date.now();
     $("btn-record").classList.add("recording");
     $("pill").classList.remove("hidden");
+    updateRouteChip();
     rec.timer = setInterval(updateRecPill, 1000);
     updateRecPill();
     toast("Recording your track");
@@ -744,6 +790,7 @@ function toggleRecord() {
     clearInterval(rec.timer);
     $("btn-record").classList.remove("recording");
     $("pill").classList.add("hidden");
+    updateRouteChip();
     if (rec.points.length > 2) {
       const name = "Ride " + new Date(rec.start).toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
         " " + new Date(rec.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -807,24 +854,167 @@ function renderTracks() {
   }
 }
 
+/* ---------------- elevation sampling ----------------
+   The packs carry real elevation: AWS Terrain Tiles (Terrarium PNG,
+   SRTM-derived) repacked as single-zoom PMTiles — zoom 12 in the three
+   region packs, zoom 10 statewide. elevationAt() decodes those same
+   tiles in-app (works offline from OPFS) and bilinear-samples them.
+   If no DEM tile covers a point (pack not downloaded and offline),
+   elevation comes back null and the route bar says so — no guessing. */
+const _demTileCache = new Map(); // "z/x/y" -> Promise<Float32Array|null>
+function _tileXY(lng, lat, z) {
+  const n = 2 ** z, rad = lat * Math.PI / 180;
+  const x = (lng + 180) / 360 * n;
+  const y = (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n;
+  return { tx: Math.floor(x), ty: Math.floor(y), fx: x - Math.floor(x), fy: y - Math.floor(y) };
+}
+function _demTile(reg, tx, ty) {
+  const key = reg.zoom + "/" + tx + "/" + ty;
+  if (_demTileCache.has(key)) return _demTileCache.get(key);
+  const job = (async () => {
+    try {
+      const res = await reg.pmt.getZxy(reg.zoom, tx, ty);
+      if (!res || !res.data) return null;
+      const bmp = await createImageBitmap(new Blob([res.data], { type: "image/png" }));
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 256;
+      const cx = cv.getContext("2d", { willReadFrequently: true });
+      cx.drawImage(bmp, 0, 0);
+      const d = cx.getImageData(0, 0, 256, 256).data;
+      const out = new Float32Array(256 * 256);
+      for (let i = 0; i < 256 * 256; i++) {
+        const e = d[i * 4] * 256 + d[i * 4 + 1] + d[i * 4 + 2] / 256 - 32768;
+        out[i] = e < -1000 ? NaN : e; // Terrarium void pixels read as -32768
+      }
+      return out;
+    } catch (e) { return null; }
+  })();
+  _demTileCache.set(key, job);
+  return job;
+}
+async function elevationAt(lng, lat) {
+  const regs = Object.values(demRegistry).sort((a, b) => b.zoom - a.zoom);
+  for (const reg of regs) {
+    const { tx, ty, fx, fy } = _tileXY(lng, lat, reg.zoom);
+    const tile = await _demTile(reg, tx, ty);
+    if (!tile) continue;
+    const px = fx * 256 - 0.5, py = fy * 256 - 0.5;
+    const x0 = Math.max(0, Math.min(254, Math.floor(px))), y0 = Math.max(0, Math.min(254, Math.floor(py)));
+    const ax = Math.max(0, Math.min(1, px - x0)), ay = Math.max(0, Math.min(1, py - y0));
+    const corners = [[tile[y0 * 256 + x0], (1 - ax) * (1 - ay)], [tile[y0 * 256 + x0 + 1], ax * (1 - ay)],
+                     [tile[(y0 + 1) * 256 + x0], (1 - ax) * ay], [tile[(y0 + 1) * 256 + x0 + 1], ax * ay]];
+    let sum = 0, wsum = 0;
+    for (const [v, w] of corners) if (!Number.isNaN(v)) { sum += v * w; wsum += w; }
+    if (wsum > 0) return sum / wsum;
+  }
+  return null;
+}
+
 /* ---------------- route planner ---------------- */
 let routeMode = false, routePts = [];
+try {
+  const saved = JSON.parse(localStorage.getItem("ohv.route") || "[]");
+  if (Array.isArray(saved)) routePts = saved.filter((p) => Array.isArray(p) && p.length === 2 && isFinite(p[0]) && isFinite(p[1]));
+} catch (e) {}
+let routeEle = { status: "idle" }; // idle | measuring | ok | nodata
 function routeDistance() {
   let d = 0;
   for (let i = 1; i < routePts.length; i++) d += haversine(routePts[i - 1], routePts[i]);
   return d;
 }
+const fmtFt = (m) => Math.round(m * 3.28084).toLocaleString("en-US") + " ft";
+function updateRouteChip() {
+  const chip = $("route-chip");
+  const show = !routeMode && !rec.on && routePts.length >= 2;
+  chip.classList.toggle("hidden", !show);
+  if (show) chip.textContent = "Route: " + fmtMi(routeDistance()) + " — tap to keep building";
+}
+function renderRouteStats() {
+  const el = $("route-ele"), prof = $("route-profile");
+  if (!routeMode || routePts.length < 2 || routeEle.status === "idle") {
+    el.classList.add("hidden"); prof.classList.add("hidden"); return;
+  }
+  el.classList.remove("hidden");
+  if (routeEle.status === "measuring") {
+    el.textContent = "Elevation: measuring from the map's terrain data…";
+    prof.classList.add("hidden"); return;
+  }
+  if (routeEle.status === "nodata") {
+    el.textContent = "Elevation: not available here — download a map pack to measure climb";
+    prof.classList.add("hidden"); return;
+  }
+  el.textContent = "Climb ↑ " + fmtFt(routeEle.gainM) + " · Down ↓ " + fmtFt(routeEle.lossM) + " · High point " + fmtFt(routeEle.maxM);
+  const P = routeEle.profile;
+  if (P && P.length > 1) {
+    const maxD = P[P.length - 1][0] || 1, lo = routeEle.minM, span = Math.max(routeEle.maxM - lo, 10);
+    const ptsStr = P.map(([d, e]) => (d / maxD * 300).toFixed(1) + "," + (50 - (e - lo) / span * 44).toFixed(1)).join(" ");
+    prof.innerHTML = '<polygon points="0,56 ' + ptsStr + ' 300,56" fill="rgba(30,132,73,0.25)"/>' +
+      '<polyline points="' + ptsStr + '" fill="none" stroke="#1e8449" stroke-width="2"/>';
+    prof.classList.remove("hidden");
+  } else prof.classList.add("hidden");
+}
 function updateRouteBar() {
   $("route-info").textContent = routePts.length < 2
     ? "Tap the map to drop points (" + routePts.length + " dropped)"
     : "Route: " + fmtMi(routeDistance()) + " — straight-line, not trail directions";
+  updateRouteChip();
+  renderRouteStats();
+}
+let _routeEleSeq = 0, _eleTimer = null;
+function scheduleRouteElevation() {
+  clearTimeout(_eleTimer);
+  _eleTimer = setTimeout(computeRouteElevation, 200);
+}
+async function computeRouteElevation() {
+  const seq = ++_routeEleSeq;
+  if (routePts.length < 2) { routeEle = { status: "idle" }; renderRouteStats(); return; }
+  routeEle = { status: "measuring" }; renderRouteStats();
+  // resample the polyline about every 60 m so climbs register honestly
+  const pts = [routePts[0]];
+  for (let i = 1; i < routePts.length; i++) {
+    const a = routePts[i - 1], b = routePts[i];
+    const steps = Math.max(1, Math.min(240, Math.ceil(haversine(a, b) / 60)));
+    for (let s = 1; s <= steps; s++) pts.push([a[0] + (b[0] - a[0]) * s / steps, a[1] + (b[1] - a[1]) * s / steps]);
+  }
+  const eles = [];
+  for (const p of pts) eles.push(await elevationAt(p[0], p[1]));
+  if (seq !== _routeEleSeq) return; // route changed while measuring
+  const valid = eles.filter((e) => e != null);
+  if (valid.length < 2) { routeEle = { status: "nodata" }; renderRouteStats(); return; }
+  let last = valid[0];
+  const filled = eles.map((e) => { if (e != null) last = e; return last; });
+  // light 3-point smoothing keeps SRTM noise out of the totals
+  const sm = filled.map((e, i) => (filled[Math.max(0, i - 1)] + e + filled[Math.min(filled.length - 1, i + 1)]) / 3);
+  // gain/loss with hysteresis: count a climb or drop once the line has
+  // moved at least 2 m from the last counted elevation
+  let gain = 0, loss = 0, ref = sm[0];
+  for (let i = 1; i < sm.length; i++) {
+    const d = sm[i] - ref;
+    if (d >= 2) { gain += d; ref = sm[i]; }
+    else if (d <= -2) { loss += -d; ref = sm[i]; }
+  }
+  const profile = [];
+  let dist = 0;
+  for (let i = 0; i < pts.length; i++) {
+    if (i) dist += haversine(pts[i - 1], pts[i]);
+    profile.push([dist, sm[i]]);
+  }
+  routeEle = { status: "ok", gainM: gain, lossM: loss,
+    minM: Math.min(...sm), maxM: Math.max(...sm), profile };
+  renderRouteStats();
+}
+function routeChanged() {
+  try { localStorage.setItem("ohv.route", JSON.stringify(routePts)); } catch (e) {}
+  applyDynamic();
+  updateRouteBar();
+  scheduleRouteElevation();
 }
 function setRouteMode(on) {
   routeMode = on;
   $("btn-route").classList.toggle("active", on);
   $("route-bar").classList.toggle("hidden", !on);
-  if (!on) { routePts = []; applyDynamic(); }
-  else { updateRouteBar(); toast("Route mode: tap the map to drop points"); }
+  if (on) { updateRouteBar(); scheduleRouteElevation(); toast("Route mode: tap the map to drop points"); }
+  else updateRouteChip(); // the route stays on the map when you leave the mode
 }
 
 /* ---------------- info cards ---------------- */
@@ -852,7 +1042,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": 
 function onMapClick(e) {
   if (routeMode) {
     routePts.push([e.lngLat.lng, e.lngLat.lat]);
-    applyDynamic(); updateRouteBar();
+    routeChanged();
     return;
   }
   if (!map) return;
@@ -1016,7 +1206,7 @@ async function rebuildMap() {
 function maybeRunTestHook() {
   if (!location.hash.startsWith("#test")) return;
   const q = new URLSearchParams(location.hash.slice(1));
-  window.__ohvTest = { map, version: "1" };
+  window.__ohvTest = { map, version: "3" };
   const lng = parseFloat(q.get("lng")), lat = parseFloat(q.get("lat")), z = parseFloat(q.get("z") || "13");
   if (isNaN(lng) || isNaN(lat)) return;
   map.jumpTo({ center: [lng, lat], zoom: z });
@@ -1045,8 +1235,9 @@ function wireUI() {
   $("btn-follow").onclick = () => setFollow((followMode + 1) % 3);
   $("btn-record").onclick = toggleRecord;
   $("btn-route").onclick = () => setRouteMode(!routeMode);
-  $("route-undo").onclick = () => { routePts.pop(); applyDynamic(); updateRouteBar(); };
-  $("route-clear").onclick = () => { routePts = []; applyDynamic(); updateRouteBar(); };
+  $("route-chip").onclick = () => setRouteMode(true);
+  $("route-undo").onclick = () => { routePts.pop(); routeChanged(); };
+  $("route-clear").onclick = () => { routePts = []; routeChanged(); };
   $("route-done").onclick = () => setRouteMode(false);
   $("card-close").onclick = closeCard;
   $("btn-north").onclick = () => { map.easeTo({ bearing: 0 }); if (followMode === 2) setFollow(1); };
