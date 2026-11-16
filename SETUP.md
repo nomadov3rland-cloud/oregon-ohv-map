@@ -13,12 +13,15 @@ downloaded maps move with it — nothing else changes.)
 2. Tap the **⋮ menu** (top right) → **Add to Home screen** (or "Install app").
    Now it lives on your home screen like a regular app, named **OR OHV Map**.
 3. Open it from the home screen. You'll see the map of Oregon.
-4. Tap the **📦 Packs** button (bottom right — it has a red dot until the
-   Oregon pack is on your phone).
-5. Tap **Download** on **All of Oregon** (164 MB). Wait for it to finish —
-   stay on Wi-Fi. This is the big one: the whole state's roads, towns,
-   rivers, land-ownership colors, forest names and boundaries, the state
-   border, every trail and camp in the pack, hillshade and contour lines.
+4. Tap the **Packs** button (right side — every button on the right has a
+   picture and a word under it so you can tell them apart at a glance. It
+   has a red dot until the Oregon pack is on your phone).
+5. Tap **Download** on **All of Oregon** (183 MB). Wait for it to finish —
+   stay on Wi-Fi. This is the big one: the whole state's roads (including
+   the small roads and forest tracks, which now stay visible when you
+   zoom out), towns, rivers, land-ownership colors, forest names and
+   boundaries, the state border, every trail and camp in the pack,
+   hillshade and contour lines.
 6. Download **Tillamook, Clatsop & Columbia County** too (128 MB) — that's
    your home riding country in close-up detail: Tillamook State Forest
    (Browns Camp, Jordan Creek, Diamond Mill, Rogers Camp), Clatsop State
@@ -26,7 +29,7 @@ downloaded maps move with it — nothing else changes.)
 7. Optional, grab them whenever: **Mt. Hood** (19 MB) and
    **Central Oregon — Bend, Santiam & Ochoco** (64 MB).
 
-All four together: **375 MB** on your phone. Done — you never have to
+All four together: **394 MB** on your phone. Done — you never have to
 download them again.
 
 **When a pack gets better:** if a pack card ever says **⬆ Updated version
@@ -35,15 +38,25 @@ changed (usually a few MB), not the whole pack again.
 
 ## Using it in the woods
 
-- **Blue dot** = you. The **🎯 button** (right side) cycles: tap once to
-  follow yourself, tap again and the map turns with your direction
-  (heading-up), tap a third time to turn follow off.
-- **⏺ Record** = breadcrumb track. Tap to start, ride, tap to stop. The
+- **Blue dot** = you. The **Follow button** (right side) cycles: tap once
+  to follow yourself, tap again and the map turns with your direction
+  (heading-up), tap a third time to turn follow off. When the map is
+  turned, a **North button** appears at the bottom of the right-side
+  buttons — tap it to point the map north again. It sits below the other
+  buttons with space around it, so it never covers them.
+- **Record** = breadcrumb track. Tap to start, ride, tap to stop. The
   track saves on your phone. Find saved tracks in the **☰ menu** — you can
   show them on the map, or export/share them as GPX files.
-- **🧭 Route** = tap points on the map to measure a route. It draws
-  straight lines between your points and adds up the miles. It's a
-  measuring tool, NOT turn-by-turn directions — it says so right on screen.
+- **Route** = tap points on the map to build a route. It draws straight
+  lines between your points and adds up the miles live, and it measures
+  the **climb and descent** (total feet up, total feet down, and the high
+  point) from the map's real elevation data, with a little elevation
+  picture of your route. **Undo** takes the last point back, **Clear**
+  wipes it. Tap **Done** and the route stays drawn on the map — a small
+  pill at the bottom shows its miles and tapping it lets you keep
+  building. The route is still there if you close and reopen the app.
+  It's a measuring tool, NOT turn-by-turn directions — it says so right
+  on screen.
 - **Tap things**: tap a **trail** and its whole route lights up yellow —
   every segment with that trail's name — with a card showing what it's open
   to and its season. Tap a **campsite/staging dot** for its name and details.

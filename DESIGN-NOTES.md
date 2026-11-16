@@ -158,3 +158,43 @@ borders — at least the state border."
   verification: scripts/cdp-test2.mjs (fresh profile → download →
   tamper a file size to prove the update path → Update → go offline →
   reload → screenshots, all assertions logged, zero console errors).
+
+## v3 pass (Nov 16, 2026)
+
+Travis's three asks, plus one real-phone fix:
+
+- **Small roads stay visible when zoomed out.** Diagnosis first: it was
+  the TILE DATA, not the style. Decoding Protomaps tiles around Browns
+  Camp showed minor roads and forest tracks are entirely absent below
+  zoom 12 (planetiler generalization) — no style can draw missing data.
+  Fix: a new `lowroads.pmtiles` in the Oregon pack (19.4 MB; pack grows
+  164 → 183 MB), built from the Geofabrik Oregon OSM extract
+  (scripts/build-lowroads.py + build-lowroads.sh): secondary/tertiary,
+  unclassified/residential, and tracks at zooms 8–11, service roads
+  excluded (340k driveways = noise), geometry simplified ~24 m,
+  sub-90 m stubs dropped, residential held to z10+. At zoom 12 the
+  basemap's own tiles start carrying minor roads, so the app hands off
+  there (layers maxzoom 11.99). Proof: the z10 tile over Browns Camp
+  went from 0 minor/track roads (basemap) to 4,156 (overlay).
+- **Labeled buttons.** The right-side stack is now icon + word chips
+  (Follow, Record, Route, Packs), inline SVG icons (no external images,
+  offline-safe), 66×64px glove targets.
+- **North reset relocated.** It used to be a floating button at a fixed
+  offset that covered stack buttons in heading-up mode (Travis hit this
+  on his Razr). It now lives inside the stack's flow, last, with extra
+  clearance — overlap is structurally impossible.
+- **Route builder, real elevation.** Route mode already measured
+  straight-line miles; v3 adds climb/descent + high point + an elevation
+  profile, sampled from the packs' own Terrarium DEM tiles (z12 region
+  / z10 statewide, SRTM via AWS Terrain Tiles) decoded in-app — the
+  same data that draws the hillshade. ~60 m resampling, light smoothing,
+  2 m hysteresis so SRTM noise doesn't inflate totals. No DEM coverage
+  (pack not downloaded, offline) = the bar says elevation is
+  unavailable; nothing is faked from contours. Routes now persist
+  (localStorage): Done keeps the route on the map with a mileage pill
+  to resume, and it survives an app restart. Still honestly labeled
+  "straight-line, not trail directions"; no snap-to-trail (that would
+  pretend to be a routing engine).
+- Service worker ohv-v3, packs.json version 3. Existing installs see
+  the Oregon pack as "Partly downloaded" and fetch only the new
+  19.4 MB lowroads file. Verification: scripts/cdp-test3.mjs.
