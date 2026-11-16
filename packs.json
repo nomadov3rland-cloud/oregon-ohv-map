@@ -1,0 +1,133 @@
+{
+ "version": 1,
+ "bundles": [
+  {
+   "id": "oregon",
+   "name": "All of Oregon",
+   "desc": "The whole state: roads, towns, rivers, land ownership colors, every OHV trail and camp in the pack, hillshade and contour lines. Start with this one.",
+   "files": [
+    {
+     "id": "basemap-oregon",
+     "file": "basemap-oregon-z12.pmtiles",
+     "role": "basemap",
+     "size": 48779300
+    },
+    {
+     "id": "dem-oregon",
+     "file": "dem-oregon-z10.pmtiles",
+     "role": "dem",
+     "size": 56205151,
+     "maxzoom": 10
+    },
+    {
+     "id": "contours-oregon",
+     "file": "contours-oregon.pmtiles",
+     "role": "contours",
+     "size": 35341841
+    },
+    {
+     "id": "land",
+     "file": "land.pmtiles",
+     "role": "land",
+     "size": 18369684
+    },
+    {
+     "id": "trails",
+     "file": "trails.pmtiles",
+     "role": "trails",
+     "size": 7418806
+    },
+    {
+     "id": "trailnames",
+     "file": "trailnames.geojson",
+     "role": "trailnames",
+     "size": 2601964
+    },
+    {
+     "id": "camping",
+     "file": "camping.geojson",
+     "role": "camping",
+     "size": 175989
+    }
+   ]
+  },
+  {
+   "id": "northcoast",
+   "name": "Tillamook, Clatsop & Columbia County",
+   "desc": "Close-up detail for the north coast range: Tillamook State Forest (Browns Camp, Jordan Creek, Diamond Mill, Rogers Camp), Clatsop State Forest (Nicolai Mountain), Mt. Baber and Columbia County. Adds street-level detail, buildings and fine contour lines on top of the Oregon pack.",
+   "files": [
+    {
+     "id": "basemap-northcoast",
+     "file": "basemap-northcoast-z15.pmtiles",
+     "role": "basemap",
+     "size": 72610644
+    },
+    {
+     "id": "dem-northcoast",
+     "file": "dem-northcoast-z12.pmtiles",
+     "role": "dem",
+     "size": 36248328,
+     "maxzoom": 12
+    },
+    {
+     "id": "contours-northcoast",
+     "file": "contours-northcoast.pmtiles",
+     "role": "contours",
+     "size": 25564609
+    }
+   ]
+  },
+  {
+   "id": "mthood",
+   "name": "Mt. Hood",
+   "desc": "Close-up detail for Mt. Hood National Forest and the Hood River valley: La Dee Flat and McCubbins Gulch OHV areas, plus fine contour lines.",
+   "files": [
+    {
+     "id": "basemap-mthood",
+     "file": "basemap-mthood-z15.pmtiles",
+     "role": "basemap",
+     "size": 5996759
+    },
+    {
+     "id": "dem-mthood",
+     "file": "dem-mthood-z12.pmtiles",
+     "role": "dem",
+     "size": 7279284,
+     "maxzoom": 12
+    },
+    {
+     "id": "contours-mthood",
+     "file": "contours-mthood.pmtiles",
+     "role": "contours",
+     "size": 6414433
+    }
+   ]
+  },
+  {
+   "id": "central",
+   "name": "Central Oregon \u2014 Bend, Santiam & Ochoco",
+   "desc": "Close-up detail for the Santiam Pass area, Bend and the Ochoco National Forest: China Hat / East Fort Rock, Edison Butte, Santiam Pass OHV, plus fine contour lines.",
+   "files": [
+    {
+     "id": "basemap-central",
+     "file": "basemap-central-z15.pmtiles",
+     "role": "basemap",
+     "size": 24060432
+    },
+    {
+     "id": "dem-central",
+     "file": "dem-central-z12.pmtiles",
+     "role": "dem",
+     "size": 26631736,
+     "maxzoom": 12
+    },
+    {
+     "id": "contours-central",
+     "file": "contours-central.pmtiles",
+     "role": "contours",
+     "size": 16813904
+    }
+   ]
+  }
+ ]
+}
