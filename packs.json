@@ -1,10 +1,10 @@
 {
- "version": 1,
+ "version": 2,
  "bundles": [
   {
    "id": "oregon",
    "name": "All of Oregon",
-   "desc": "The whole state: roads, towns, rivers, land ownership colors, every OHV trail and camp in the pack, hillshade and contour lines. Start with this one.",
+   "desc": "The whole state: roads, towns, rivers, land ownership colors with forest names and boundaries, the state border, every OHV trail and camp in the pack, hillshade and contour lines. Start with this one.",
    "files": [
     {
      "id": "basemap-oregon",
@@ -48,6 +48,18 @@
      "file": "camping.geojson",
      "role": "camping",
      "size": 175989
+    },
+    {
+     "id": "units",
+     "file": "units.geojson",
+     "role": "units",
+     "size": 3204058
+    },
+    {
+     "id": "bounds",
+     "file": "bounds.geojson",
+     "role": "bounds",
+     "size": 133354
     }
    ]
   },

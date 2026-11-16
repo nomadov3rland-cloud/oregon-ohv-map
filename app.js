@@ -48,7 +48,17 @@ function allFiles() {
   return out;
 }
 function fileById(id) { return allFiles().find((x) => x.file.id === id); }
-function isLocal(file) { return !!localFiles[file.id]; }
+/* A downloaded file counts as current only if its recorded size matches the
+   size in packs.json. If a pack file changes on the server (new data), the
+   size mismatch marks the on-phone copy "stale" and it gets re-downloaded —
+   so updates actually reach phones that already downloaded the old pack. */
+function fileState(file) {
+  const rec = localFiles[file.id];
+  if (!rec) return "missing";
+  if (file.size && rec.size !== file.size) return "stale";
+  return "current";
+}
+function isLocal(file) { return fileState(file) === "current"; }
 
 async function sourceFor(file) {
   // Returns {url, pmtiles} — registers the archive with the protocol.
@@ -68,6 +78,19 @@ async function sourceFor(file) {
 
 async function campingData() {
   const f = fileById("camping").file;
+  if (isLocal(f)) {
+    const blob = await opfsFile(f.file);
+    if (blob) return JSON.parse(await blob.text());
+  }
+  const res = await fetch("packs/" + f.file);
+  return res.json();
+}
+
+/* Generic loader for the small GeoJSON pack files (units, bounds). */
+async function packGeojson(fileId) {
+  const entry = fileById(fileId);
+  if (!entry) return null;
+  const f = entry.file;
   if (isLocal(f)) {
     const blob = await opfsFile(f.file);
     if (blob) return JSON.parse(await blob.text());
@@ -103,6 +126,30 @@ function routeTotals(src, grp) {
 const FONT_MED = ["Noto Sans Medium"];
 const FONT_REG = ["Noto Sans Regular"];
 
+/* Land paint: default = ownership colors. Camping view = the same data
+   re-read three ways (campable / check the rules / no) so a single glance
+   answers "can I camp here?". applyCampingView() swaps these expressions. */
+const LAND_FILL = ["match", ["get", "cat"],
+  "usfs", "rgba(86,168,80,0.44)", "blm", "rgba(242,197,60,0.48)",
+  "nps", "rgba(166,110,190,0.42)", "fed", "rgba(148,140,185,0.40)",
+  "state", "rgba(70,160,242,0.44)", "tribal", "rgba(244,152,60,0.44)",
+  "local", "rgba(160,175,185,0.42)", "rgba(0,0,0,0)"];
+const LAND_LINE = ["match", ["get", "cat"],
+  "usfs", "rgba(46,110,46,0.85)", "blm", "rgba(160,125,15,0.85)",
+  "nps", "rgba(110,72,132,0.85)", "fed", "rgba(98,90,132,0.8)",
+  "state", "rgba(42,102,172,0.85)", "tribal", "rgba(182,108,26,0.85)",
+  "local", "rgba(110,120,125,0.8)", "rgba(0,0,0,0)"];
+const CAMP_FILL = ["match", ["get", "cat"],
+  ["usfs", "blm"], "rgba(30,155,62,0.55)",
+  ["state", "fed", "nps", "local"], "rgba(243,171,50,0.55)",
+  "tribal", "rgba(138,128,116,0.50)",
+  "rgba(0,0,0,0)"];
+const CAMP_LINE = ["match", ["get", "cat"],
+  ["usfs", "blm"], "rgba(16,106,42,0.9)",
+  ["state", "fed", "nps", "local"], "rgba(176,114,8,0.9)",
+  "tribal", "rgba(102,93,82,0.85)",
+  "rgba(0,0,0,0)"];
+
 async function buildStyle() {
   const sources = {};
   const bm = {};   // bundleId -> sourceId for basemaps
@@ -124,6 +171,8 @@ async function buildStyle() {
       sources.trails = { type: "vector", url: await sourceFor(file) };
     }
   }
+  sources.units = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
+  sources.bounds = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
   sources.camping = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
   sources.me = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
   sources.track = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
@@ -167,23 +216,32 @@ async function buildStyle() {
         "hillshade-accent-color": "#5a6e46", "hillshade-exaggeration": 0.32 } });
   }
 
-  // land ownership shading
+  // land ownership shading (or camping view — same layers, swapped paint)
   if (sources.land) {
     push({ id: "land-fill", type: "fill", source: "land", "source-layer": "land", minzoom: 5,
       layout: { visibility: layerOn("land") ? "visible" : "none" },
-      paint: { "fill-color": ["match", ["get", "cat"],
-        "usfs", "rgba(96,176,96,0.34)", "blm", "rgba(240,205,80,0.38)",
-        "nps", "rgba(171,127,188,0.34)", "fed", "rgba(158,152,190,0.32)",
-        "state", "rgba(100,170,240,0.34)", "tribal", "rgba(245,166,80,0.36)",
-        "local", "rgba(178,190,197,0.34)", "rgba(0,0,0,0)"] } });
+      paint: { "fill-color": campViewOn() ? CAMP_FILL : LAND_FILL } });
     push({ id: "land-line", type: "line", source: "land", "source-layer": "land", minzoom: 7,
       layout: { visibility: layerOn("land") ? "visible" : "none" },
-      paint: { "line-color": ["match", ["get", "cat"],
-        "usfs", "rgba(52,120,52,0.75)", "blm", "rgba(170,135,20,0.75)",
-        "nps", "rgba(120,80,140,0.75)", "fed", "rgba(105,98,140,0.7)",
-        "state", "rgba(50,110,180,0.75)", "tribal", "rgba(190,115,30,0.75)",
-        "local", "rgba(120,130,135,0.7)", "rgba(0,0,0,0)"],
-        "line-width": 0.8 } });
+      paint: { "line-color": campViewOn() ? CAMP_LINE : LAND_LINE,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.7, 12, 1.4] } });
+  }
+
+  // named-unit outlines: where one forest / district ends and the next begins
+  {
+    const vis = layerOn("land") ? "visible" : "none";
+    const lineF = (tier) => ["all", ["==", ["get", "kind"], "line"], ["==", ["get", "tier"], tier]];
+    push({ id: "unit-line2", type: "line", source: "units", minzoom: 9, filter: lineF(2),
+      layout: { visibility: vis },
+      paint: { "line-color": "rgba(70,60,45,0.45)", "line-width": 0.9 } });
+    push({ id: "unit-case1", type: "line", source: "units", minzoom: 5.5, filter: lineF(1),
+      layout: { "line-join": "round", visibility: vis },
+      paint: { "line-color": "rgba(255,255,255,0.55)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 6, 2.4, 11, 3.4] } });
+    push({ id: "unit-line1", type: "line", source: "units", minzoom: 5.5, filter: lineF(1),
+      layout: { "line-join": "round", visibility: vis },
+      paint: { "line-color": "rgba(58,50,38,0.8)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1.2, 11, 1.8] } });
   }
 
   // contours
@@ -205,8 +263,8 @@ async function buildStyle() {
       minzoom: Math.max(minz + 1, 11), ...(maxz ? { maxzoom: maxz } : {}),
       filter: ["==", ["get", "level"], "index"],
       layout: { "symbol-placement": "line", "text-field": ["concat", ["to-string", ["get", "ele"]], " m"],
-        "text-font": FONT_REG, "text-size": 10.5, visibility: layerOn("contours") ? "visible" : "none" },
-      paint: { "text-color": "#7d6435", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.2 } });
+        "text-font": FONT_REG, "text-size": 11, visibility: layerOn("contours") ? "visible" : "none" },
+      paint: { "text-color": "#7d6435", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.4 } });
   };
   if (sources["ct-oregon"]) addContours("ct-oregon", "ct-oregon", 9, 12.49);
   for (const r of REGIONS) if (sources["ct-" + r]) addContours("ct-" + r, "ct-" + r, 12.5, null);
@@ -220,13 +278,22 @@ async function buildStyle() {
          paint: { "line-color": "#8fb8dd",
            "line-width": ["match", ["get", "kind"], "river", 1.8, "canal", 1.1, 0.9] } });
 
-  // boundaries
-  push({ id: "bound-county", type: "line", source: state, "source-layer": "boundaries", minzoom: 8,
+  // boundaries — U.S. Census Bureau lines (bounds.geojson in the Oregon pack):
+  // counties subtle, the Oregon state border strong enough to read at a
+  // glance at any zoom, with a white casing so it survives any background.
+  push({ id: "bound-county", type: "line", source: "bounds", minzoom: 7.5,
          filter: ["==", ["get", "kind"], "county"],
-         paint: { "line-color": "rgba(110,105,90,0.45)", "line-width": 0.7, "line-dasharray": [3, 2] } });
-  push({ id: "bound-state", type: "line", source: state, "source-layer": "boundaries",
+         paint: { "line-color": "rgba(96,90,78,0.55)", "line-width": 0.9, "line-dasharray": [4, 3] } });
+  push({ id: "bound-state-case", type: "line", source: "bounds",
          filter: ["==", ["get", "kind"], "state"],
-         paint: { "line-color": "rgba(90,85,70,0.7)", "line-width": 1.1, "line-dasharray": [5, 2] } });
+         layout: { "line-cap": "round", "line-join": "round" },
+         paint: { "line-color": "rgba(255,255,255,0.9)",
+           "line-width": ["interpolate", ["linear"], ["zoom"], 5, 3.6, 9, 5, 13, 6.5] } });
+  push({ id: "bound-state", type: "line", source: "bounds",
+         filter: ["==", ["get", "kind"], "state"],
+         layout: { "line-cap": "round", "line-join": "round" },
+         paint: { "line-color": "#40382c",
+           "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.9, 9, 2.8, 13, 3.6] } });
 
   // roads — generated per basemap source
   const roadPaint = {
@@ -280,9 +347,9 @@ async function buildStyle() {
       minzoom: Math.max(minz || 0, 9),
       filter: ["any", ["has", "name"], ["has", "ref"]],
       layout: { "symbol-placement": "line", "text-field": ["coalesce", ["get", "name"], ["get", "ref"]],
-        "text-font": FONT_REG, "text-size": ["interpolate", ["linear"], ["zoom"], 9, 10.5, 14, 12.5],
+        "text-font": FONT_REG, "text-size": ["interpolate", ["linear"], ["zoom"], 9, 11.5, 14, 14],
         "text-max-angle": 30 },
-      paint: { "text-color": "#5a5148", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.4 } });
+      paint: { "text-color": "#4a4238", "text-halo-color": "rgba(255,255,255,0.95)", "text-halo-width": 1.8 } });
   }
   addRoads(state, "st", 0, null, 12.99);
   for (const r of REGIONS) if (bm[r]) addRoads(bm[r], r, 12.5, null, null);
@@ -314,8 +381,8 @@ async function buildStyle() {
     push({ id: "trails-label", type: "symbol", source: "trails", "source-layer": "trails", minzoom: 13.5,
       filter: ["has", "name"],
       layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": FONT_REG,
-        "text-size": 11, visibility: vis },
-      paint: { "text-color": "#7a3c10", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.3 } });
+        "text-size": 12, visibility: vis },
+      paint: { "text-color": "#7a3c10", "text-halo-color": "rgba(255,255,255,0.92)", "text-halo-width": 1.5 } });
   }
 
   // selected-trail highlight: exact geometry from vector tiles at riding zooms,
@@ -348,9 +415,27 @@ async function buildStyle() {
       paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.4, 14, 6.2],
         "circle-color": "#ff8c1a" } });
     push({ id: "camp-label", type: "symbol", source: "camping", minzoom: 12,
-      layout: { "text-field": ["get", "name"], "text-font": FONT_REG, "text-size": 11.5,
+      layout: { "text-field": ["get", "name"], "text-font": FONT_REG, "text-size": 13,
         "text-offset": [0, 1.1], "text-anchor": "top", visibility: vis },
-      paint: { "text-color": "#6b4210", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.3 } });
+      paint: { "text-color": "#6b4210", "text-halo-color": "rgba(255,255,255,0.92)", "text-halo-width": 1.5 } });
+  }
+
+  // forest / unit name labels — "what forest am I in", printed on the land.
+  // Tier 1 (national & state forests, BLM districts) reads at regional zoom
+  // and fades out before street level; tier 2 joins at mid zoom.
+  {
+    const vis = layerOn("land") ? "visible" : "none";
+    const labelF = (tier) => ["all", ["==", ["get", "kind"], "label"], ["==", ["get", "tier"], tier]];
+    push({ id: "unit-label2", type: "symbol", source: "units", minzoom: 9, maxzoom: 12.2, filter: labelF(2),
+      layout: { "text-field": ["get", "name"], "text-font": FONT_MED,
+        "text-size": ["interpolate", ["linear"], ["zoom"], 9, 11, 12, 13.5],
+        "text-transform": "uppercase", "text-max-width": 9, visibility: vis },
+      paint: { "text-color": "#4d5548", "text-halo-color": "rgba(255,255,255,0.92)", "text-halo-width": 1.8 } });
+    push({ id: "unit-label1", type: "symbol", source: "units", minzoom: 5.8, maxzoom: 11.8, filter: labelF(1),
+      layout: { "text-field": ["get", "name"], "text-font": FONT_MED,
+        "text-size": ["interpolate", ["linear"], ["zoom"], 5.8, 11.5, 8, 15, 11, 18],
+        "text-transform": "uppercase", "text-max-width": 9, visibility: vis },
+      paint: { "text-color": "#2f4632", "text-halo-color": "rgba(255,255,255,0.94)", "text-halo-width": 2 } });
   }
 
   // water + place labels (statewide to z13, regions above)
@@ -360,25 +445,25 @@ async function buildStyle() {
       minzoom: Math.max(minz || 0, 10), ...(maxz ? { maxzoom: maxz } : {}),
       filter: ["all", ["==", ["geometry-type"], "LineString"], ["has", "name"]],
       layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": FONT_REG,
-        "text-size": 11 },
-      paint: { "text-color": "#4a7ca8", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.2 } });
+        "text-size": 12 },
+      paint: { "text-color": "#3d6f9e", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.5 } });
     const placeLayer = (suffix, kinds, minZoom, size, font) => push({
       id: idp + "-pl-" + suffix, type: "symbol", source: srcId, "source-layer": "places",
       minzoom: Math.max(minz || 0, minZoom), ...(maxz ? { maxzoom: maxz } : {}),
       filter: ["in", ["get", "kind"], ["literal", kinds]],
       layout: { "text-field": ["get", "name"], "text-font": font || FONT_MED,
         "text-size": size, "text-max-width": 8 },
-      paint: { "text-color": "#3d3830", "text-halo-color": "rgba(255,255,255,0.92)", "text-halo-width": 1.6 } });
-    placeLayer("city", ["city"], 4, ["interpolate", ["linear"], ["zoom"], 4, 13, 10, 19]);
-    placeLayer("town", ["town"], 7, ["interpolate", ["linear"], ["zoom"], 7, 11.5, 12, 15.5]);
-    placeLayer("village", ["village"], 9.5, 12);
-    placeLayer("hamlet", ["hamlet", "neighbourhood", "suburb", "quarter"], 11.5, 11, FONT_REG);
+      paint: { "text-color": "#2e2a24", "text-halo-color": "rgba(255,255,255,0.95)", "text-halo-width": 2 } });
+    placeLayer("city", ["city"], 4, ["interpolate", ["linear"], ["zoom"], 4, 14.5, 10, 21.5]);
+    placeLayer("town", ["town"], 7, ["interpolate", ["linear"], ["zoom"], 7, 12.5, 12, 17]);
+    placeLayer("village", ["village"], 9.5, 13);
+    placeLayer("hamlet", ["hamlet", "neighbourhood", "suburb", "quarter"], 11.5, 12, FONT_REG);
     push({ id: idp + "-peak", type: "symbol", source: srcId, "source-layer": "pois",
       minzoom: Math.max(minz || 0, 10), ...(maxz ? { maxzoom: maxz } : {}),
       filter: ["==", ["get", "kind"], "peak"],
       layout: { "text-field": ["concat", "▲ ", ["get", "name"], "\n", ["to-string", ["get", "elevation"]], " m"],
-        "text-font": FONT_REG, "text-size": 10.5, "text-anchor": "top", "text-offset": [0, 0.2] },
-      paint: { "text-color": "#6e6252", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.3 } });
+        "text-font": FONT_REG, "text-size": 11.5, "text-anchor": "top", "text-offset": [0, 0.2] },
+      paint: { "text-color": "#6e6252", "text-halo-color": "rgba(255,255,255,0.92)", "text-halo-width": 1.5 } });
   };
   addLabels(state, "st", 0, 12.99);
   for (const r of REGIONS) if (bm[r]) addLabels(bm[r], r, 13, null);
@@ -421,14 +506,25 @@ async function buildStyle() {
 }
 
 /* ---------------- layer toggles ---------------- */
-const layerState = { land: true, trails: true, camping: true, terrain: true, contours: true };
+const layerState = { land: true, trails: true, camping: true, terrain: true, contours: true, campview: false };
 try { Object.assign(layerState, JSON.parse(localStorage.getItem("ohv.layers") || "{}")); } catch (e) {}
 function layerOn(k) { return layerState[k] !== false; }
+function campViewOn() { return layerState.campview === true; }
+function applyCampingView() {
+  if (!window._map) return;
+  const m = window._map, on = campViewOn();
+  if (m.getLayer("land-fill")) m.setPaintProperty("land-fill", "fill-color", on ? CAMP_FILL : LAND_FILL);
+  if (m.getLayer("land-line")) m.setPaintProperty("land-line", "line-color", on ? CAMP_LINE : LAND_LINE);
+  const lg = $("legend"), lc = $("legend-camp"), lh = $("legend-head");
+  if (lg) lg.classList.toggle("hidden", on);
+  if (lc) lc.classList.toggle("hidden", !on);
+  if (lh) lh.textContent = on ? "Camping view — green means campable" : "Land colors — what they mean";
+}
 function applyLayerVisibility() {
   if (!window._map) return;
   const m = window._map;
   const set = (ids, on) => ids.forEach((id) => { if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
-  set(["land-fill", "land-line"], layerOn("land"));
+  set(["land-fill", "land-line", "unit-case1", "unit-line1", "unit-line2", "unit-label1", "unit-label2"], layerOn("land"));
   set(["trails-case", "trails-mvum", "trails-odf", "trails-usfs", "trails-label",
        "trails-hl-case", "trails-hl", "tn-hl-case", "tn-hl"], layerOn("trails"));
   set(["camp-ring", "camp-dot", "camp-label"], layerOn("camping"));
@@ -504,6 +600,14 @@ async function initMap() {
 async function onStyleReady() {
   if (!map) return;
   applyLayerVisibility();
+  applyCampingView();
+  for (const id of ["units", "bounds"]) {
+    try {
+      const d = await packGeojson(id);
+      const src = map.getSource(id);
+      if (src && d) src.setData(d);
+    } catch (e) { /* units/bounds load when the Oregon pack is available */ }
+  }
   try {
     const data = await campingData();
     const src = map.getSource("camping");
@@ -517,8 +621,21 @@ async function onStyleReady() {
   if (selectedTrail) setTrailHighlight(selectedTrail);
   applyDynamic();
   refreshPacksBadge();
+  if (!updateToastShown) {
+    updateToastShown = true;
+    const og = PACKS && PACKS.bundles.find((b) => b.id === "oregon");
+    if (og) {
+      const st = bundleStatus(og);
+      // he already has most of the Oregon pack, but some files are new or
+      // changed on the server — point him at the (small) update once.
+      if ((st === "partial" || st === "stale") && og.files.some((f) => fileState(f) === "current")) {
+        toast("A map update is available — tap ⬇ Packs to get it (small download)", 6000);
+      }
+    }
+  }
   maybeRunTestHook();
 }
+let updateToastShown = false;
 
 /* dynamic (non-style) sources data */
 let mePos = null;           // {lng, lat, acc, heading, speed, t}
@@ -770,8 +887,11 @@ function onMapClick(e) {
 /* ---------------- packs UI + download ---------------- */
 const fmtMB = (b) => (b / 1048576).toFixed(b >= 104857600 ? 0 : 1) + " MB";
 function bundleStatus(b) {
-  const have = b.files.filter((f) => isLocal(f)).length;
-  return have === 0 ? "none" : have === b.files.length ? "full" : "partial";
+  const states = b.files.map((f) => fileState(f));
+  if (states.every((s) => s === "current")) return "full";
+  if (states.every((s) => s === "missing")) return "none";
+  if (states.some((s) => s === "missing")) return "partial";
+  return "stale";
 }
 function bundleBytes(b) { return b.files.reduce((s, f) => s + (f.size || 0), 0); }
 function refreshPacksBadge() {
@@ -795,13 +915,13 @@ function renderPacks() {
     const card = document.createElement("div");
     card.className = "pack-card";
     card.innerHTML = `<h4></h4><p class="pack-desc"></p>
-      <div class="pack-meta">${st === "full" ? "✓ On this phone" : st === "partial" ? "Partly downloaded" : "Not downloaded"} · ${fmtMB(bundleBytes(b))}</div>
+      <div class="pack-meta">${st === "full" ? "✓ On this phone" : st === "stale" ? "⬆ Updated version available" : st === "partial" ? "Partly downloaded" : "Not downloaded"} · ${fmtMB(bundleBytes(b))}</div>
       <div class="pack-progress hidden"><div></div></div>`;
     card.querySelector("h4").textContent = b.name;
     card.querySelector(".pack-desc").textContent = b.desc;
     const btn = document.createElement("button");
     btn.className = "pack-btn" + (st === "full" ? " secondary" : "");
-    btn.textContent = st === "full" ? "Remove from phone" : st === "partial" ? "Finish downloading" : "Download";
+    btn.textContent = st === "full" ? "Remove from phone" : st === "stale" ? "Update" : st === "partial" ? "Finish downloading" : "Download";
     btn.onclick = () => (st === "full" ? removeBundle(b, card) : downloadBundle(b, card));
     card.appendChild(btn);
     list.appendChild(card);
@@ -941,6 +1061,19 @@ function wireUI() {
   };
   bind("lyr-land", "land"); bind("lyr-trails", "trails"); bind("lyr-camping", "camping");
   bind("lyr-terrain", "terrain"); bind("lyr-contours", "contours");
+  const cv = $("lyr-campview");
+  cv.checked = campViewOn();
+  cv.onchange = () => {
+    layerState.campview = cv.checked;
+    if (cv.checked && !layerOn("land")) {
+      layerState.land = true;
+      $("lyr-land").checked = true;
+      applyLayerVisibility();
+    }
+    try { localStorage.setItem("ohv.layers", JSON.stringify(layerState)); } catch (e) {}
+    applyCampingView();
+    if (cv.checked) toast("Camping view: green = campable, amber = check the rules, gray = no");
+  };
 }
 
 /* ---------------- boot ---------------- */

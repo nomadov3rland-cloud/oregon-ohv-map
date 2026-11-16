@@ -15,10 +15,10 @@ downloaded maps move with it — nothing else changes.)
 3. Open it from the home screen. You'll see the map of Oregon.
 4. Tap the **📦 Packs** button (bottom right — it has a red dot until the
    Oregon pack is on your phone).
-5. Tap **Download** on **All of Oregon** (161 MB). Wait for it to finish —
+5. Tap **Download** on **All of Oregon** (164 MB). Wait for it to finish —
    stay on Wi-Fi. This is the big one: the whole state's roads, towns,
-   rivers, land-ownership colors, every trail and camp in the pack,
-   hillshade and contour lines.
+   rivers, land-ownership colors, forest names and boundaries, the state
+   border, every trail and camp in the pack, hillshade and contour lines.
 6. Download **Tillamook, Clatsop & Columbia County** too (128 MB) — that's
    your home riding country in close-up detail: Tillamook State Forest
    (Browns Camp, Jordan Creek, Diamond Mill, Rogers Camp), Clatsop State
@@ -26,8 +26,12 @@ downloaded maps move with it — nothing else changes.)
 7. Optional, grab them whenever: **Mt. Hood** (19 MB) and
    **Central Oregon — Bend, Santiam & Ochoco** (64 MB).
 
-All four together: **372 MB** on your phone. Done — you never have to
+All four together: **375 MB** on your phone. Done — you never have to
 download them again.
+
+**When a pack gets better:** if a pack card ever says **⬆ Updated version
+available**, tap **Update**. It only downloads the files that actually
+changed (usually a few MB), not the whole pack again.
 
 ## Using it in the woods
 
@@ -46,6 +50,17 @@ download them again.
   Tap **colored land** to see who owns it and the camping rule of thumb.
 - **☰ menu** = layer switches (land colors, trails, camps, hillshade,
   contour lines) and the plain-language legends.
+- **🏕️ Camping view** (in the ☰ menu): flips the land colors to a simple
+  three-way read — **strong green = camp here** (National Forest + BLM,
+  dispersed camping generally allowed), **amber = check the rules**
+  (state land, parks, refuges, local land), **flat gray = no camping**
+  (tribal land; private land stays uncolored). Flip it off to go back to
+  the normal ownership colors.
+- **Forest names are printed right on the map** — Tillamook State Forest,
+  Willamette National Forest, the BLM districts and so on — with a dark
+  outline around each forest, so you can see where one ends and the next
+  begins. The **Oregon state border** is a bold dark line at every zoom,
+  and county lines show faintly when you zoom in.
 
 ## What the land colors mean
 

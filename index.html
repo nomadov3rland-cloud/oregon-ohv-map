@@ -54,12 +54,13 @@
   <div id="panel-body">
     <h3>Map layers</h3>
     <label class="toggle-row"><input type="checkbox" id="lyr-land" checked><span><b>Public land colors</b><br><small>Green/tan = dispersed camping usually OK</small></span></label>
+    <label class="toggle-row"><input type="checkbox" id="lyr-campview"><span><b>🏕️ Camping view</b><br><small>Recolors the land three ways: green = campable, amber = check the rules, gray = no camping</small></span></label>
     <label class="toggle-row"><input type="checkbox" id="lyr-trails" checked><span><b>OHV trails</b><br><small>MVUM, Forest Service &amp; state forest trails. Tap any trail to light up its whole route.</small></span></label>
     <label class="toggle-row"><input type="checkbox" id="lyr-camping" checked><span><b>Camps &amp; staging</b><br><small>Campgrounds, staging areas, dispersed sites</small></span></label>
     <label class="toggle-row"><input type="checkbox" id="lyr-terrain" checked><span><b>Hillshade</b><br><small>Shaded hills so you can read the terrain</small></span></label>
     <label class="toggle-row"><input type="checkbox" id="lyr-contours" checked><span><b>Contour lines</b><br><small>Elevation lines, in meters</small></span></label>
 
-    <h3>Land colors — what they mean</h3>
+    <h3 id="legend-head">Land colors — what they mean</h3>
     <div id="legend">
       <div><span class="sw" style="background:#60b060"></span><b>National Forest</b> — dispersed camping generally allowed</div>
       <div><span class="sw" style="background:#f0cd50"></span><b>BLM land</b> — dispersed camping generally allowed</div>
@@ -70,6 +71,12 @@
       <div><span class="sw" style="background:#b4bec5"></span><b>City / county land</b> — check local rules</div>
       <div><span class="sw" style="background:#ffffff;border:1px solid #999"></span><b>No color</b> — private land, or closed to the public</div>
       <p class="fineprint">The colors say whose land it is. On National Forest land the MVUM (the orange trails) is the legal word for motorized use. Camp away from water and developed sites, mind fire restrictions and stay limits.</p>
+    </div>
+    <div id="legend-camp" class="hidden">
+      <div><span class="sw" style="background:#1e9b3e"></span><b>Camp here</b> — National Forest &amp; BLM land: dispersed camping generally allowed</div>
+      <div><span class="sw" style="background:#f3ab32"></span><b>Check the rules</b> — state, other federal &amp; local land: campgrounds or posted areas only, varies by place</div>
+      <div><span class="sw" style="background:#8a8074"></span><b>No camping</b> — tribal land. And no color at all = private land, or land closed to the public</div>
+      <p class="fineprint">The quick read. Tap any colored land for who owns it and the exact rule of thumb. On National Forest land the MVUM (orange trails) is still the legal word for motorized use.</p>
     </div>
 
     <h3>Trail colors</h3>
@@ -84,7 +91,7 @@
     <div id="tracks-list"><p class="fineprint">No tracks recorded yet. Tap the red ⏺ button on the map, ride, tap it again to stop. Your track is saved on this phone and you can share it as a GPX file.</p></div>
 
     <h3>About</h3>
-    <p class="fineprint">Built from free public data: OpenStreetMap, U.S. Forest Service MVUM &amp; trail inventory, Oregon Dept. of Forestry, USGS PAD-US land ownership, and AWS Terrain Tiles (SRTM elevation). Trail and land data are navigation aids, not survey data — obey posted signs and closures; they beat this map. Works fully offline once the map packs are downloaded.</p>
+    <p class="fineprint">Built from free public data: OpenStreetMap, U.S. Forest Service MVUM &amp; trail inventory, Oregon Dept. of Forestry (trails &amp; state forest boundaries), USGS PAD-US land ownership, U.S. Census Bureau (state &amp; county boundaries), and AWS Terrain Tiles (SRTM elevation). Trail and land data are navigation aids, not survey data — obey posted signs and closures; they beat this map. Works fully offline once the map packs are downloaded.</p>
     <p class="fineprint" id="storage-line"></p>
   </div>
 </div>

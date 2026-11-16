@@ -107,3 +107,54 @@ the app says so), and zero-learning-curve UI.
   github.com/jw148/free-wheel
 - runTiyul offline-packages doc (Terrarium DEM handling, PMTiles v3 + MVT) —
   github.com/nachem/runtiyul
+
+## v2 readability pass (Nov 16, 2026)
+
+Travis's direction: "at a glance I want to look and see whether or not an
+area is good for camping, and what part of what forest it is, and the
+borders — at least the state border."
+
+- **Camping view** — a toggle that restyles the same PAD-US land layer
+  into a three-way read instead of six ownership colors: campable
+  (USFS + BLM) in one strong green, check-the-rules (state / other
+  federal / NPS / local) in amber, no (tribal) flat gray, private
+  uncolored. Own 3-line legend swaps in with it. Same data, alternate
+  paint — no second land file in the packs.
+- **Forest identity** — new `units.geojson` in the Oregon pack (3.2 MB):
+  56 named units (46 tier-1, 10 tier-2). PAD-US parcels grouped by unit
+  name, dissolved, outlines simplified. Label points are spread on a
+  ~12 km grid across each tier-1 unit (1,530 points) so the forest's name
+  is on screen at riding zoom wherever you are in it; MapLibre collision
+  thins the repeats at regional zooms, the way printed forest maps
+  repeat names. Outlines for tier-1 units from zoom 5.5, tier-2 from 9.
+  - State forests come from ODF's own managed-lands service (Oregon
+    GEOHub), NOT PAD-US: PAD-US lumps all state forest land into one
+    627k-acre "Forest Development Fund" blob. Grouped by ODF district:
+    Clatsop 136k ac, Tillamook 364k ac (Tillamook + Forest Grove
+    districts), Santiam 47k ac, Gilchrist 72k ac / Sun Pass 21k ac
+    (Klamath-Lake district split by latitude). All within ~1% of ODF's
+    published sizes.
+  - **Known gap: Elliott State Forest is not labeled/outlined.** PAD-US
+    mislabels its block and ODF's service doesn't carry a clean Elliott
+    boundary. Left out rather than drawn wrong.
+  - BLM names cleaned for the map ("Vale Malheur (BLM)", "Lakeview
+    District (BLM)") — PAD-US raw names are office bookkeeping strings.
+- **Borders** — new `bounds.geojson` (0.13 MB) from the U.S. Census
+  Bureau TIGERweb REST service (authoritative, $0): Oregon outline
+  rendered as a bold cased line at every zoom; county lines dashed and
+  subtle from zoom 7.5. Replaces the basemap's own boundary layers.
+- **Label bumps** — place/road/water/trail labels enlarged ~20-40% with
+  stronger halos for bright-light reading; land fill opacity raised.
+- **Pack versioning fixed** — v1 recorded only that a pack's files
+  existed, so a changed pack would have stayed silently stale forever.
+  v2 records each file's size and compares against packs.json
+  (now version 2): a changed file marks the pack "⬆ Updated version
+  available" with an **Update** button that re-downloads only the
+  changed files, plus a one-time toast when an update is waiting.
+  Service worker bumped to ohv-v2 so installed copies pick up the new
+  app shell. For this update, existing Oregon-pack installs download
+  only units.geojson + bounds.geojson (~3.3 MB).
+- Builders: scripts/build-units.py, scripts/build-bounds.py;
+  verification: scripts/cdp-test2.mjs (fresh profile → download →
+  tamper a file size to prove the update path → Update → go offline →
+  reload → screenshots, all assertions logged, zero console errors).
