@@ -1,0 +1,109 @@
+# Oregon OHV Map — design study
+
+What the good offline map apps do, and what this app steals from them.
+Researched Nov 15, 2026. Sources read are cited at the bottom; patterns below
+are only the ones that matter for one job: a guy on a quad/dirt bike in the
+Oregon woods, no cell signal, gloves on, needs to know *whose land am I on,
+can I camp here, which trail is this, and how do I get back to the truck.*
+
+## The four reference apps
+
+**OsmAnd** (OSM-based, fully offline). One downloadable file per region holds
+vector map + POIs + routing; rendering styles (Default / Touring / Topo) are
+swapped on-device because the map is vector, not pictures. Trip Recording
+plugin logs GPX in the background and shows distance/speed/elevation live.
+Topography (contours, hillshade, slope) is a separate data layer you toggle.
+*Steal:* per-region downloads, vector rendering restyled on-device, a record
+button that's always one tap away, terrain as a toggleable layer.
+
+**Gaia GPS** (backcountry catalog app). The product is the *layer stack*:
+USGS topos, USFS MVUM, land-ownership overlay, all toggled over one base.
+Route builder snaps to trails/roads; tracks record offline and sync later.
+*Steal:* layer toggles as the central UI idea; ownership as an overlay, not a
+separate map; tap-a-trail info.
+
+**onX Offroad** (OHV-specific). Trails are color-coded open/closed, filterable
+by vehicle class (ATV / moto / 4x4), land ownership is color-coded the same
+way across the whole US, and offline maps are rectangular areas you save
+before you go. Tapping a trail gives name, allowed vehicles, season.
+*Steal:* vehicle-class thinking in the trail info card, ownership colors as a
+constant language, "save this area" pack model, big simple cards.
+
+**Avenza Maps** (official PDF maps, georeferenced). Dead simple: the real
+agency map (MVUM, forest visitor map) with your GPS dot on it. No styling
+magic — trust comes from it being the official document.
+*Steal:* respect for the official data (our trails ARE the MVUM/ODF data, and
+the app says so), and zero-learning-curve UI.
+
+## Patterns adopted
+
+1. **Vector tiles rendered on-device (MapLibre GL + PMTiles).** One archive
+   per area, read by byte-range — the app never loads a whole file, it pulls
+   only the tiles on screen (the same trick OsmAnd's OBF and the PMTiles PWA
+   projects use). Vector means labels stay crisp and upright at every zoom,
+   and the style can change without re-downloading data.
+2. **Region packs, downloaded once on Wi-Fi, stored on the phone.** Statewide
+   overview pack + deep packs for home riding country. Pack list shows size
+   and coverage in plain words; storage is the app's problem, not the user's.
+3. **Layers, not maps.** Land ownership shading, OHV trails, camping/staging,
+   contours/hillshade are toggles over one basemap (Gaia pattern). Defaults:
+   land + trails ON — that's the core job.
+4. **Ownership colors as a fixed language** (onX pattern, same colors as the
+   paper kit): green National Forest and tan BLM = dispersed camping
+   generally allowed; blue state; purple National Park; lavender other
+   federal; orange tribal; no color = private/closed. Legend lives one tap
+   away and in plain English.
+5. **Follow-me with heading-up.** Big location dot with a direction cone;
+   one big button toggles follow + rotate-to-heading; touching the map pauses
+   follow (standard in all four apps) with a "re-center" button to resume.
+6. **Breadcrumb recording, always one tap.** Big red record button, live
+   distance/time readout, stop → named track saved on the phone, GPX export
+   via the Android share sheet (OsmAnd/Gaia pattern). Recording must survive
+   the screen going dark — positions come from the Geolocation API watch.
+7. **Glove-sized targets.** Minimum ~56px buttons, bottom-sheet info cards
+   (thumb reach), no tiny X buttons, no hover anything. Text ≥14px, trail
+   labels sized for riding zooms (z13–15).
+8. **Tap = plain-language card.** Trail tap: name/number, who manages it,
+   what vehicles, season/open dates, length. Camp tap: name, type, fee if
+   known. No raw GIS codes anywhere.
+9. **Honest routing.** No road/trail routing engine in v1 (that's BRouter-
+   class machinery). Route = tap waypoints, straight lines, total miles,
+   labeled "straight-line — not trail directions." Better honest than fake.
+10. **No account, no server, no expiry.** Everything static files + on-device
+    storage (the anti-Gaia-subscription pattern). Maps never "expire."
+
+## Stack decisions
+
+- **MapLibre GL JS** (not Leaflet): true vector rendering, rotation/heading,
+  hillshade + 3D-capable terrain from a DEM source, smooth zoom — the things
+  the reference apps feel like. Leaflet is raster-first and rotation is a
+  hack; rejected.
+- **PMTiles archives** for basemap (Protomaps daily-build schema, extracted
+  from the free planet build with go-pmtiles), DEM (AWS terrain tiles,
+  Terrarium encoding — free, no key), and tiled overlays where GeoJSON would
+  be too heavy.
+- **PWA + OPFS**: app shell cached by a service worker; packs downloaded by
+  the app into the Origin Private File System and read through a custom
+  PMTiles `Source` (byte-range reads out of the stored file — the pattern
+  proven by offline-PMTiles PWA projects). `navigator.storage.persist()` so
+  Android doesn't evict the maps.
+- **Hosting**: GitHub Pages (shell + packs ≤100MB each). Files over the Pages
+  limit would go to GitHub Release assets; sizes are engineered to avoid
+  that if possible.
+
+## Sources read
+
+- Offroad Handbook, "15 Best Off-Road Navigation Apps" (onX/Gaia/OsmAnd
+  comparison: color-coded trails, vehicle filters, ownership colors, offline
+  storage) — offroadhandbook.com/15-best-off-road-navigation-apps/
+- OsmAnd deep-dive (OBF region files, rendering styles, Trip Recording,
+  Topography plugin) — vectree.io/pdf/c/osmand
+- ClunkTap, "Offline GPS app on mobile phone" (vector vs raster, GPX
+  record/export expectations) — clunktap.com/offline-gps-app-on-mobile-phone/
+- BigIron, "Offline maps for the field" (PMTiles/Planetiler packs,
+  per-region clipping discipline) — bigiron.cc/guides/offline-maps-for-the-field
+- free-wheel CLAUDE.md (production PWA: MapLibre + PMTiles in OPFS, custom
+  Source byte-range reads, dated Protomaps builds expire) —
+  github.com/jw148/free-wheel
+- runTiyul offline-packages doc (Terrarium DEM handling, PMTiles v3 + MVT) —
+  github.com/nachem/runtiyul
